@@ -58,4 +58,4 @@ export const MIDNIGHT_NETWORKS: Record<MidnightNetworkId, MidnightNetworkConfig>
   },
 };
 
-export const DEFAULT_MIDNIGHT_NETWORK: MidnightNetworkId = 'preprod';
+export const DEFAULT_MIDNIGHT_NETWORK: MidnightNetworkId = 'preview';

@@ -231,7 +231,7 @@ export function useMidnightVaultKeeper() {
       return;
     }
     try {
-      const api = await walletApi.connect("preprod");
+      const api = await walletApi.connect("preview");
       const config = await api.getConfiguration();
       setNetworkId(config.networkId);
       const session = await createConnectedSession(api, "/contract/vault-keeper");

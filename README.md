@@ -206,6 +206,3 @@ npm run compact:all
 - Understand Midnight's guaranteed vs. fallible transaction phases — partial success can occur
 - Review public transcript data: even with ZK privacy, some metadata is visible on-chain
 
-## Product Status
-
-VaultKeeper is structured as a full product stack (Compact contracts + operational scripts + role-aware frontend), migrated from Polkadot Hub (EVM/Solidity). See **[MIGRATION.md](./MIGRATION.md)** for details.
