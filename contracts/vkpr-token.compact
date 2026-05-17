@@ -1,0 +1,72 @@
+pragma language_version >= 0.22;
+
+import CompactStandardLibrary;
+
+// ============ LEDGER STATE ============
+
+export ledger name: Opaque<"string">;
+export ledger symbol: Opaque<"string">;
+export ledger decimals: Uint<8>;
+export ledger totalSupply: Uint<128>;
+export ledger balances: Map<Bytes<32>, Uint<128>>;
+export ledger ownerPubKey: Bytes<32>;
+
+// ============ WITNESSES ============
+
+witness caller(): Bytes<32>;
+witness ownerKey(): Bytes<32>;
+
+// ============ CONSTRUCTOR ============
+
+constructor(
+  _name: Opaque<"string">,
+  _symbol: Opaque<"string">,
+  _decimals: Uint<8>,
+  _owner: Bytes<32>,
+) {
+  name = disclose(_name);
+  symbol = disclose(_symbol);
+  decimals = disclose(_decimals);
+  totalSupply = 0;
+  ownerPubKey = disclose(_owner);
+}
+
+// ============ AUTH ============
+
+circuit assertOwner(): [] {
+  assert(ownerKey() == ownerPubKey, "not authorized");
+}
+
+// ============ TOKEN CIRCUITS ============
+
+export circuit transfer(to: Bytes<32>, value: Uint<128>): Boolean {
+  const sender = disclose(caller());
+  assert(balances.member(sender), "no balance");
+  const senderBal = balances.lookup(sender);
+  assert(senderBal >= value, "insufficient balance");
+
+  balances.insert(sender, disclose((senderBal - value) as Uint<128>));
+
+  const recipientBal = balances.member(disclose(to))
+    ? balances.lookup(disclose(to))
+    : 0;
+  balances.insert(disclose(to), disclose((recipientBal + value) as Uint<128>));
+
+  return true;
+}
+
+export circuit mint(to: Bytes<32>, value: Uint<128>): [] {
+  assertOwner();
+
+  const recipientBal = balances.member(disclose(to))
+    ? balances.lookup(disclose(to))
+    : 0;
+  balances.insert(disclose(to), disclose((recipientBal + value) as Uint<128>));
+  totalSupply = disclose((totalSupply + value) as Uint<128>);
+}
+
+export circuit balanceOf(account: Bytes<32>): Uint<128> {
+  const disclosedAccount = disclose(account);
+  if (!balances.member(disclosedAccount)) { return 0; }
+  return balances.lookup(disclosedAccount);
+}

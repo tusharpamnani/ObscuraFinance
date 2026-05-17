@@ -1,0 +1,71 @@
+{
+  "name": "vaultkeeper-midnight",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "compact:vk": "compact compile contracts/vault-keeper.compact contracts/managed/vault-keeper",
+    "compact:token": "compact compile contracts/vkpr-token.compact contracts/managed/vkpr-token",
+    "compact:all": "npm run compact:vk && npm run compact:token",
+    "deploy:vk": "MIDNIGHT_NETWORK=preprod tsx scripts-midnight/deploy-vault-keeper.ts",
+    "deploy:vk:local": "MIDNIGHT_NETWORK=undeployed tsx scripts-midnight/deploy-vault-keeper.ts",
+    "deploy:token": "MIDNIGHT_NETWORK=preprod tsx scripts-midnight/deploy-vkpr-token.ts",
+    "deploy:token:local": "MIDNIGHT_NETWORK=undeployed tsx scripts-midnight/deploy-vkpr-token.ts",
+    "deploy:all:local": "npm run deploy:vk:local && npm run deploy:token:local",
+    "vaults:set-reward-token": "MIDNIGHT_NETWORK=preprod tsx scripts-midnight/vault-set-reward-token.ts",
+    "vaults:create": "MIDNIGHT_NETWORK=preprod tsx scripts-midnight/vault-create.ts",
+    "vaults:update-apy": "MIDNIGHT_NETWORK=preprod tsx scripts-midnight/vault-update-apy.ts",
+    "vaults:toggle": "MIDNIGHT_NETWORK=preprod tsx scripts-midnight/vault-toggle.ts",
+    "vaults:emergency-withdraw": "MIDNIGHT_NETWORK=preprod tsx scripts-midnight/vault-emergency-withdraw.ts",
+    "owner:1:deploy": "npm run deploy:vk",
+    "owner:2:set-reward-token": "VAULT_KEEPER_ADDRESS=$VK_ADDRESS REWARD_TOKEN_ADDRESS=$VKPR_ADDRESS npm run vaults:set-reward-token",
+    "owner:3:create-stable": "VAULT_KEEPER_ADDRESS=$VK_ADDRESS VAULT_NAME=Stable VAULT_RISK_LEVEL=0 VAULT_MIN_APY_BPS=500 VAULT_MAX_APY_BPS=800 VAULT_TOKEN_ADDRESS=$STABLE_VAULT_TOKEN_ADDRESS npm run vaults:create",
+    "owner:4:create-growth": "VAULT_KEEPER_ADDRESS=$VK_ADDRESS VAULT_NAME=Growth VAULT_RISK_LEVEL=1 VAULT_MIN_APY_BPS=1200 VAULT_MAX_APY_BPS=1800 VAULT_TOKEN_ADDRESS=$GROWTH_VAULT_TOKEN_ADDRESS npm run vaults:create",
+    "owner:5:create-turbo": "VAULT_KEEPER_ADDRESS=$VK_ADDRESS VAULT_NAME=Turbo VAULT_RISK_LEVEL=2 VAULT_MIN_APY_BPS=2500 VAULT_MAX_APY_BPS=4000 VAULT_TOKEN_ADDRESS=$TURBO_VAULT_TOKEN_ADDRESS npm run vaults:create",
+    "seed:wallet": "MIDNIGHT_NETWORK=undeployed tsx scripts-midnight/seed-wallets.ts",
+    "seed:wallet:preprod": "MIDNIGHT_NETWORK=preprod tsx scripts-midnight/seed-wallets.ts",
+    "local:up": "docker compose up -d --wait",
+    "local:down": "docker compose down",
+    "local:logs": "docker compose logs -f"
+  },
+  "dependencies": {
+    "@midnight-ntwrk/compact-js": "2.5.0",
+    "@midnight-ntwrk/compact-runtime": "0.16.0",
+    "@midnight-ntwrk/ledger-v8": "8.0.3",
+    "@midnight-ntwrk/midnight-js-contracts": "4.0.4",
+    "@midnight-ntwrk/midnight-js-http-client-proof-provider": "4.0.4",
+    "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "4.0.4",
+    "@midnight-ntwrk/midnight-js-level-private-state-provider": "4.0.4",
+    "@midnight-ntwrk/midnight-js-network-id": "4.0.4",
+    "@midnight-ntwrk/midnight-js-node-zk-config-provider": "4.0.4",
+    "@midnight-ntwrk/midnight-js-types": "4.0.4",
+    "@midnight-ntwrk/midnight-js-utils": "4.0.4",
+    "@midnight-ntwrk/testkit-js": "4.0.4",
+    "@midnight-ntwrk/wallet-sdk-address-format": "3.1.0",
+    "@midnight-ntwrk/wallet-sdk-dust-wallet": "3.0.0",
+    "@midnight-ntwrk/wallet-sdk-facade": "3.0.0",
+    "@midnight-ntwrk/wallet-sdk-hd": "3.0.1",
+    "@midnight-ntwrk/wallet-sdk-shielded": "2.1.0",
+    "@midnight-ntwrk/wallet-sdk-unshielded-wallet": "2.1.0",
+    "axios": "^1.15.0",
+    "buffer": "^6.0.3",
+    "pino": "^9.0.0",
+    "pino-pretty": "^13.0.0",
+    "rxjs": "^7.8.2",
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.9",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  },
+  "resolutions": {
+    "@midnight-ntwrk/ledger-v8": "8.0.3",
+    "@midnight-ntwrk/midnight-js-network-id": "4.0.4",
+    "@midnight-ntwrk/compact-runtime": "0.16.0"
+  }
+}

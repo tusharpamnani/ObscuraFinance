@@ -1,0 +1,162 @@
+pragma language_version >= 0.22;
+
+import CompactStandardLibrary;
+
+export ledger vaultCount: Uint<64>;
+export ledger ownerPubKey: Bytes<32>;
+export ledger rewardToken: Maybe<Bytes<32>>;
+
+export ledger vaultNames: Map<Uint<64>, Opaque<"string">>;
+export ledger vaultRisks: Map<Uint<64>, Uint<8>>;
+export ledger vaultMinAPYs: Map<Uint<64>, Uint<64>>;
+export ledger vaultMaxAPYs: Map<Uint<64>, Uint<64>>;
+export ledger vaultTVLs: Map<Uint<64>, Uint<128>>;
+export ledger vaultTokens: Map<Uint<64>, Bytes<32>>;
+export ledger vaultActives: Map<Uint<64>, Boolean>;
+
+export ledger userVaults: Map<Bytes<32>, Uint<64>>;
+export ledger userAmounts: Map<Bytes<32>, Uint<128>>;
+export ledger userTimestamps: Map<Bytes<32>, Uint<64>>;
+export ledger userRewardsClaimed: Map<Bytes<32>, Uint<128>>;
+
+witness caller(): Bytes<32>;
+witness ownerKey(): Bytes<32>;
+
+const YEAR_SECONDS: Uint<64> = 31536000;
+const BPS_DENOM: Uint<64> = 10000;
+
+constructor(owner: Bytes<32>) {
+  ownerPubKey = disclose(owner);
+  vaultCount = 0;
+  rewardToken = none<Bytes<32>>();
+}
+
+circuit assertOwner(): [] {
+  assert(ownerKey() == ownerPubKey, "not authorized");
+}
+
+export circuit setRewardToken(token: Bytes<32>): [] {
+  assertOwner();
+  rewardToken = disclose(some<Bytes<32>>(token));
+}
+
+export circuit createVault(
+  name: Opaque<"string">,
+  riskLevel: Uint<8>,
+  minAPY: Uint<64>,
+  maxAPY: Uint<64>,
+  tokenAddress: Bytes<32>,
+): [] {
+  assertOwner();
+  assert(minAPY <= maxAPY, "invalid apy range");
+  assert(tokenAddress != pad(32, ""), "invalid token");
+
+  const id = vaultCount;
+  vaultNames.insert(id, disclose(name));
+  vaultRisks.insert(id, disclose(riskLevel));
+  vaultMinAPYs.insert(id, disclose(minAPY));
+  vaultMaxAPYs.insert(id, disclose(maxAPY));
+  vaultTVLs.insert(id, 0);
+  vaultTokens.insert(id, disclose(tokenAddress));
+  vaultActives.insert(id, true);
+
+  vaultCount = disclose((id + 1) as Uint<64>);
+}
+
+export circuit updateAPY(vaultId: Uint<64>, minAPY: Uint<64>, maxAPY: Uint<64>): [] {
+  assertOwner();
+  assert(vaultId < vaultCount, "invalid vault");
+  assert(minAPY <= maxAPY, "invalid apy range");
+  vaultMinAPYs.insert(disclose(vaultId), disclose(minAPY));
+  vaultMaxAPYs.insert(disclose(vaultId), disclose(maxAPY));
+}
+
+export circuit toggleVaultActive(vaultId: Uint<64>): [] {
+  assertOwner();
+  assert(vaultId < vaultCount, "invalid vault");
+  const disclosedId = disclose(vaultId);
+  const wasActive = vaultActives.member(disclosedId)
+    ? vaultActives.lookup(disclosedId)
+    : false;
+  vaultActives.insert(disclosedId, disclose(!wasActive));
+}
+
+export circuit deposit(vaultId: Uint<64>, amount: Uint<128>, currentTime: Uint<64>): [] {
+  const disclosedVaultId = disclose(vaultId);
+  assert(disclosedVaultId < vaultCount, "invalid vault");
+  assert(vaultActives.member(disclosedVaultId), "vault not found");
+  assert(vaultActives.lookup(disclosedVaultId), "vault not active");
+  assert(amount > 0, "amount must be > 0");
+
+  const user = disclose(caller());
+
+  const prevAmount = userAmounts.member(user)
+    ? userAmounts.lookup(user)
+    : 0;
+  const prevTVL = vaultTVLs.member(disclosedVaultId)
+    ? vaultTVLs.lookup(disclosedVaultId)
+    : 0;
+
+  userVaults.insert(user, disclosedVaultId);
+  userAmounts.insert(user, disclose((prevAmount + amount) as Uint<128>));
+  userTimestamps.insert(user, disclose(currentTime));
+  vaultTVLs.insert(disclosedVaultId, disclose((prevTVL + amount) as Uint<128>));
+}
+
+export circuit withdraw(amount: Uint<128>, currentTime: Uint<64>): [] {
+  assert(amount > 0, "invalid amount");
+
+  const user = disclose(caller());
+  assert(userAmounts.member(user), "no deposit");
+  assert(userAmounts.lookup(user) >= amount, "insufficient balance");
+
+  const vaultId = userVaults.lookup(user);
+  const prevTVL = vaultTVLs.lookup(vaultId);
+
+  userAmounts.insert(user, disclose((userAmounts.lookup(user) - amount) as Uint<128>));
+  userTimestamps.insert(user, disclose(currentTime));
+  vaultTVLs.insert(disclose(vaultId), disclose((prevTVL - amount) as Uint<128>));
+}
+
+export circuit claimRewards(vaultId: Uint<64>, currentTime: Uint<64>): [] {
+  assert(rewardToken.is_some, "reward token not set");
+
+  const disclosedVaultId = disclose(vaultId);
+  assert(disclosedVaultId < vaultCount, "invalid vault");
+
+  const user = disclose(caller());
+  assert(userAmounts.member(user), "no deposit");
+
+  const vaultAssigned = userVaults.member(user)
+    ? userVaults.lookup(user)
+    : 0;
+  assert(vaultAssigned == disclosedVaultId, "wrong vault");
+
+  const amount = userAmounts.lookup(user);
+  assert(amount > 0, "zero deposit");
+
+  const lastTime = userTimestamps.lookup(user);
+  assert(currentTime > lastTime, "invalid time");
+
+  const maxAPY = vaultMaxAPYs.member(disclosedVaultId)
+    ? vaultMaxAPYs.lookup(disclosedVaultId)
+    : 0;
+  assert(maxAPY > 0, "vault has no APY");
+
+  const elapsed = (currentTime - lastTime) as Uint<128>;
+  const reward = ((amount * (maxAPY as Uint<128>) * elapsed) / ((YEAR_SECONDS as Uint<128>) * (BPS_DENOM as Uint<128>))) as Uint<128>;
+
+  userTimestamps.insert(user, disclose(currentTime));
+
+  const prevClaimed = userRewardsClaimed.member(user)
+    ? userRewardsClaimed.lookup(user)
+    : 0;
+  userRewardsClaimed.insert(user, disclose((prevClaimed + reward) as Uint<128>));
+}
+
+export circuit emergencyWithdraw(vaultId: Uint<64>): [] {
+  assertOwner();
+  assert(vaultId < vaultCount, "invalid vault");
+
+  vaultTVLs.insert(disclose(vaultId), 0);
+}

@@ -1,0 +1,9 @@
+node_modules
+.env
+
+logs/
+contracts/managed/
+dist/
+
+# Midnight local stack persistent data
+# (Docker volumes managed by compose.yml)
